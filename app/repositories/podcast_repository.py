@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Category, Podcast, PodcastCategory
@@ -23,6 +23,37 @@ class PodcastRepository:
 
     def get_by_rss_url(self, rss_url: str) -> Podcast | None:
         return self.session.scalar(select(Podcast).where(Podcast.rss_url == rss_url))
+
+    def list(self, *, search: str | None, category_name: str | None, limit: int, offset: int) -> list[Podcast]:
+        statement = select(Podcast).order_by(Podcast.title).limit(limit).offset(offset)
+        if search:
+            search_pattern = f"%{search}%"
+            statement = statement.where(
+                or_(Podcast.title.ilike(search_pattern), Podcast.author.ilike(search_pattern))
+            )
+        if category_name:
+            statement = (
+                statement.join(PodcastCategory, Podcast.id == PodcastCategory.podcast_id)
+                .join(Category, PodcastCategory.category_id == Category.id)
+                .where(Category.name == category_name)
+                .distinct()
+            )
+        return list(self.session.scalars(statement))
+
+    def count(self, *, search: str | None, category_name: str | None) -> int:
+        statement = select(func.count(func.distinct(Podcast.id)))
+        if search:
+            search_pattern = f"%{search}%"
+            statement = statement.where(
+                or_(Podcast.title.ilike(search_pattern), Podcast.author.ilike(search_pattern))
+            )
+        if category_name:
+            statement = (
+                statement.join(PodcastCategory, Podcast.id == PodcastCategory.podcast_id)
+                .join(Category, PodcastCategory.category_id == Category.id)
+                .where(Category.name == category_name)
+            )
+        return int(self.session.scalar(statement) or 0)
 
     def create(self, **values: object) -> Podcast:
         podcast = Podcast(**values)

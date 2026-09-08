@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.db.models import Podcast
+from app.repositories.episode_repository import EpisodeRepository
 from app.repositories.podcast_repository import PodcastRepository
 
 
@@ -38,3 +39,29 @@ class PodcastService:
             category = self.repository.get_or_create_category(name)
             self.repository.add_category(podcast, category)
         return podcast
+
+    def list_podcasts(
+        self, *, search: str | None, category_name: str | None, page: int, page_size: int
+    ) -> tuple[list[Podcast], int]:
+        offset = (page - 1) * page_size
+        podcasts = self.repository.list(
+            search=search,
+            category_name=category_name,
+            limit=page_size,
+            offset=offset,
+        )
+        return podcasts, self.repository.count(search=search, category_name=category_name)
+
+    def get_detail(
+        self, podcast_id: uuid.UUID, *, episodes_page: int, episodes_page_size: int
+    ) -> tuple[Podcast | None, list, int]:
+        podcast = self.repository.get_by_id(podcast_id)
+        if podcast is None:
+            return None, [], 0
+        episode_repository = EpisodeRepository(self.repository.session)
+        episodes = episode_repository.list_for_podcast(
+            podcast_id,
+            limit=episodes_page_size,
+            offset=(episodes_page - 1) * episodes_page_size,
+        )
+        return podcast, episodes, episode_repository.count_for_podcast(podcast_id)

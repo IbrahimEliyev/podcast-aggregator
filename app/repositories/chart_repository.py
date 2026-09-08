@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import date
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import ChartSnapshot
+from app.db.models import Category, ChartSnapshot
 
 
 class ChartRepository:
@@ -32,4 +32,49 @@ class ChartRepository:
             .order_by(ChartSnapshot.rank)
             .limit(limit)
         )
+        return list(self.session.scalars(statement))
+
+    def latest_date(
+        self, *, source: str, country: str, category_name: str | None, chart_type: str
+    ) -> date | None:
+        statement = select(func.max(ChartSnapshot.snapshot_date)).where(
+            ChartSnapshot.source == source,
+            ChartSnapshot.country == country,
+            ChartSnapshot.chart_type == chart_type,
+        )
+        if category_name is None:
+            statement = statement.where(ChartSnapshot.category_id.is_(None))
+        else:
+            statement = statement.join(Category, ChartSnapshot.category_id == Category.id).where(
+                Category.name == category_name
+            )
+        return self.session.scalar(statement)
+
+    def list_chart_by_category(
+        self,
+        *,
+        source: str,
+        country: str,
+        snapshot_date: date,
+        category_name: str | None,
+        chart_type: str,
+        limit: int,
+    ) -> list[ChartSnapshot]:
+        statement = (
+            select(ChartSnapshot)
+            .where(
+                ChartSnapshot.source == source,
+                ChartSnapshot.country == country,
+                ChartSnapshot.snapshot_date == snapshot_date,
+                ChartSnapshot.chart_type == chart_type,
+            )
+            .order_by(ChartSnapshot.rank)
+            .limit(limit)
+        )
+        if category_name is None:
+            statement = statement.where(ChartSnapshot.category_id.is_(None))
+        else:
+            statement = statement.join(Category, ChartSnapshot.category_id == Category.id).where(
+                Category.name == category_name
+            )
         return list(self.session.scalars(statement))

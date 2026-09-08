@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Episode
@@ -35,3 +35,6 @@ class EpisodeRepository:
             .offset(offset)
         )
         return list(self.session.scalars(statement))
+
+    def count_for_podcast(self, podcast_id: uuid.UUID) -> int:
+        return int(self.session.scalar(select(func.count(Episode.id)).where(Episode.podcast_id == podcast_id)) or 0)

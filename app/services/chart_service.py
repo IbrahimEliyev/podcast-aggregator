@@ -24,3 +24,32 @@ class ChartService:
             podcast_id=podcast_id,
             episode_id=episode_id,
         )
+
+    def get_chart(
+        self,
+        *,
+        source: str,
+        country: str,
+        category_name: str | None,
+        snapshot_date: date | None,
+        chart_type: str,
+        limit: int,
+    ) -> tuple[date | None, list[ChartSnapshot]]:
+        normalized_country = country.upper()
+        selected_date = snapshot_date or self.repository.latest_date(
+            source=source,
+            country=normalized_country,
+            category_name=category_name,
+            chart_type=chart_type,
+        )
+        if selected_date is None:
+            return None, []
+        items = self.repository.list_chart_by_category(
+            source=source,
+            country=normalized_country,
+            snapshot_date=selected_date,
+            category_name=category_name,
+            chart_type=chart_type,
+            limit=limit,
+        )
+        return selected_date, items
