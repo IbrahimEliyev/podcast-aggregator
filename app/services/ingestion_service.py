@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -23,8 +24,9 @@ class ChartIngestionService:
         country: str,
         category: str | None,
         snapshot_date: date,
-    ) -> int:
+    ) -> list[UUID]:
         category_id = None
+        podcast_ids: list[UUID] = []
         if category:
             category_id = self.podcast_service.repository.get_or_create_category(category).id
 
@@ -38,6 +40,8 @@ class ChartIngestionService:
                     "spotify_id": entry.external_id,
                 }
             )
+            if podcast.id not in podcast_ids:
+                podcast_ids.append(podcast.id)
             if category:
                 self.podcast_service.assign_categories(podcast.id, [category])
             self.chart_repository.upsert_snapshot(
@@ -49,4 +53,4 @@ class ChartIngestionService:
                 rank=entry.rank,
                 podcast_id=podcast.id,
             )
-        return len(entries)
+        return podcast_ids

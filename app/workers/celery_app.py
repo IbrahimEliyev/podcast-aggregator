@@ -14,6 +14,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.collect_spotify_chart",
         "schedule": 86400,
         "args": ("US", None),
-    }
+    },
+    "sync-podcast-episodes-daily": {
+        "task": "app.workers.tasks.sync_all_podcast_episodes",
+        "schedule": 86400,
+    },
 }
 celery_app.autodiscover_tasks(["app.workers"])

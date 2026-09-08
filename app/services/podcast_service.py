@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.models import Podcast
 from app.repositories.episode_repository import EpisodeRepository
 from app.repositories.podcast_repository import PodcastRepository
+from app.schemas.ingestion import EnrichedPodcastData
 
 
 class PodcastService:
@@ -15,7 +16,7 @@ class PodcastService:
 
     def upsert_podcast(self, values: dict[str, object]) -> Podcast:
         podcast = None
-        for field in ("spotify_id", "podchaser_id", "podcast_index_id"):
+        for field in ("spotify_id", "apple_id", "podchaser_id", "podcast_index_id"):
             value = values.get(field)
             if value:
                 podcast = self.repository.get_by_external_id(field, str(value))
@@ -38,6 +39,18 @@ class PodcastService:
         for name in category_names:
             category = self.repository.get_or_create_category(name)
             self.repository.add_category(podcast, category)
+        return podcast
+
+    def enrich_podcast(
+        self, podcast_id: uuid.UUID, metadata: EnrichedPodcastData
+    ) -> Podcast:
+        podcast = self.repository.get_by_id(podcast_id)
+        if podcast is None:
+            raise ValueError(f"Podcast not found: {podcast_id}")
+
+        podcast = self.repository.update_metadata(podcast, metadata)
+        if metadata.categories:
+            self.assign_categories(podcast.id, metadata.categories)
         return podcast
 
     def list_podcasts(

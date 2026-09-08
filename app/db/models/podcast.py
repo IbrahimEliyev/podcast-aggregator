@@ -26,6 +26,7 @@ class Podcast(Base):
     rating_count: Mapped[int | None] = mapped_column()
     episode_frequency: Mapped[str | None] = mapped_column(String(100))
     spotify_id: Mapped[str | None] = mapped_column(String(255), unique=True)
+    apple_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     podchaser_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     podcast_index_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

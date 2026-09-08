@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Category, Podcast, PodcastCategory
+from app.schemas.ingestion import EnrichedPodcastData
 
 
 class PodcastRepository:
@@ -16,13 +17,17 @@ class PodcastRepository:
         return self.session.get(Podcast, podcast_id)
 
     def get_by_external_id(self, field: str, value: str) -> Podcast | None:
-        allowed_fields = {"spotify_id", "podchaser_id", "podcast_index_id"}
+        allowed_fields = {"spotify_id", "apple_id", "podchaser_id", "podcast_index_id"}
         if field not in allowed_fields:
             raise ValueError(f"Unsupported external ID field: {field}")
         return self.session.scalar(select(Podcast).where(getattr(Podcast, field) == value))
 
     def get_by_rss_url(self, rss_url: str) -> Podcast | None:
         return self.session.scalar(select(Podcast).where(Podcast.rss_url == rss_url))
+
+    def list_ids_with_rss(self) -> list[uuid.UUID]:
+        statement = select(Podcast.id).where(Podcast.rss_url.is_not(None)).order_by(Podcast.id)
+        return list(self.session.scalars(statement))
 
     def list(self, *, search: str | None, category_name: str | None, limit: int, offset: int) -> list[Podcast]:
         statement = select(Podcast).order_by(Podcast.title).limit(limit).offset(offset)
@@ -65,6 +70,27 @@ class PodcastRepository:
         self.session.add(podcast)
         self.session.flush()
         return podcast
+
+    def update_metadata(
+        self, podcast: Podcast, metadata: EnrichedPodcastData
+    ) -> Podcast:
+        values = {
+            "description": metadata.description,
+            "author": metadata.author,
+            "publisher": metadata.publisher,
+            "cover_image_url": metadata.cover_image_url,
+            "rss_url": metadata.rss_url,
+            "language": metadata.language,
+            "rating": metadata.rating,
+            "rating_count": metadata.rating_count,
+            "episode_frequency": metadata.episode_frequency,
+            "apple_id": metadata.apple_id,
+            "podcast_index_id": metadata.podcast_index_id,
+        }
+        for field, value in values.items():
+            if value is not None:
+                setattr(podcast, field, value)
+        return self.save(podcast)
 
     def get_or_create_category(self, name: str) -> Category:
         category = self.session.scalar(select(Category).where(Category.name == name))
