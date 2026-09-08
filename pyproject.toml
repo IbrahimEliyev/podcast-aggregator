@@ -5,8 +5,10 @@ description = "Podcast chart aggregation and API platform"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.13,<2.0",
+    "beautifulsoup4>=4.12,<5.0",
     "celery[redis]>=5.4,<6.0",
     "fastapi>=0.115,<1.0",
+    "httpx>=0.27,<1.0",
     "psycopg[binary]>=3.2,<4.0",
     "python-dotenv>=1.0,<2.0",
     "redis>=5.0,<6.0",

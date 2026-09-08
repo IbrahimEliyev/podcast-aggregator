@@ -19,6 +19,25 @@ class ChartRepository:
         self.session.flush()
         return snapshot
 
+    def upsert_snapshot(self, **values: object) -> ChartSnapshot:
+        statement = select(ChartSnapshot).where(
+            ChartSnapshot.source == values["source"],
+            ChartSnapshot.country == values["country"],
+            ChartSnapshot.category_id == values["category_id"],
+            ChartSnapshot.snapshot_date == values["snapshot_date"],
+            ChartSnapshot.chart_type == values["chart_type"],
+            ChartSnapshot.rank == values["rank"],
+        )
+        snapshot = self.session.scalar(statement)
+        if snapshot is None:
+            snapshot = ChartSnapshot(**values)
+            self.session.add(snapshot)
+        else:
+            for field, value in values.items():
+                setattr(snapshot, field, value)
+        self.session.flush()
+        return snapshot
+
     def list_chart(self, *, source: str, country: str, snapshot_date: date, category_id: uuid.UUID | None = None, chart_type: str = "podcast", limit: int = 100) -> list[ChartSnapshot]:
         statement = (
             select(ChartSnapshot)

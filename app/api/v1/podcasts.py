@@ -44,7 +44,6 @@ def get_podcast(
         podcast_id,
         episodes_page=episodes_page,
         episodes_page_size=episodes_page_size,
-        episodes_total=episodes_total,
     )
     if podcast is None:
         raise HTTPException(status_code=404, detail="Podcast not found")
@@ -65,4 +64,5 @@ def get_podcast(
         episodes=episodes,
         episodes_page=episodes_page,
         episodes_page_size=episodes_page_size,
+        episodes_total=episodes_total,
     )
