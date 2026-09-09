@@ -10,6 +10,7 @@ from app.clients.podchaser_client import PodchaserClient
 from app.clients.rss_client import RSSClient
 from app.clients.spotify_client import SpotifyClient
 from app.db.session import SessionLocal
+from app.db.partitioning import ensure_chart_snapshot_partitions
 from app.services.ingestion_service import ChartIngestionService
 from app.services.episode_service import EpisodeService
 from app.services.podcast_service import PodcastService
@@ -38,6 +39,17 @@ def configured_spotify_countries() -> set[str]:
         for country in raw_countries
         if len(country.strip()) == 2 and country.strip().isalpha()
     }
+
+
+def configured_chart_categories() -> list[str | None]:
+    """Return the overall chart plus configured category names."""
+    raw_categories = os.getenv("CHART_CATEGORIES", "").split(",")
+    categories: list[str | None] = [None]
+    for raw_category in raw_categories:
+        category = raw_category.strip()
+        if category and category not in categories:
+            categories.append(category)
+    return categories
 
 
 @celery_app.task(
@@ -163,14 +175,28 @@ def collect_configured_chart_countries() -> int:
     """Queue provider-supported chart collection for every configured market."""
     countries = configured_chart_countries()
     spotify_countries = configured_spotify_countries()
+    categories = configured_chart_categories()
     for country in countries:
-        if country in spotify_countries:
-            collect_spotify_chart.delay(country, None)
+        for category in categories:
+            if country in spotify_countries:
+                collect_spotify_chart.delay(country, category)
+            if os.getenv("PODCHASER_ENABLED", "false").lower() == "true":
+                collect_podchaser_chart.delay(country, category)
         collect_apple_podcast_chart.delay(country, None)
         collect_apple_episode_chart.delay(country, None)
-        if os.getenv("PODCHASER_ENABLED", "false").lower() == "true":
-            collect_podchaser_chart.delay(country, None)
     return len(countries)
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def maintain_chart_snapshot_partitions(self) -> int:
+    with SessionLocal.begin() as session:
+        partitions = ensure_chart_snapshot_partitions(session, months_ahead=2)
+    return len(partitions)
 
 
 @celery_app.task(

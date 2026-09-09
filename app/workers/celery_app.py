@@ -10,6 +10,10 @@ celery_app = Celery(
 )
 
 celery_app.conf.beat_schedule = {
+    "maintain-chart-snapshot-partitions-daily": {
+        "task": "app.workers.tasks.maintain_chart_snapshot_partitions",
+        "schedule": 86400,
+    },
     "collect-configured-chart-countries-daily": {
         "task": "app.workers.tasks.collect_configured_chart_countries",
         "schedule": 86400,

@@ -17,14 +17,18 @@ class ChartSnapshot(Base):
             "source", "country", "category_id", "snapshot_date", "chart_type", "rank",
             name="uq_chart_snapshot_rank",
         ),
-        Index("ix_chart_snapshots_lookup", "source", "country", "category_id", "snapshot_date", "rank"),
+        Index(
+            "ix_chart_snapshots_lookup",
+            "source", "country", "category_id", "snapshot_date", "chart_type", "rank",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source: Mapped[str] = mapped_column(String(50), nullable=False)
     country: Mapped[str] = mapped_column(String(2), nullable=False)
     category_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
-    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # PostgreSQL partitioned-table keys must include the partition column.
+    snapshot_date: Mapped[date] = mapped_column(Date, primary_key=True, nullable=False)
     chart_type: Mapped[str] = mapped_column(String(20), nullable=False, default="podcast")
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     podcast_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("podcasts.id", ondelete="CASCADE"), nullable=False, index=True)
