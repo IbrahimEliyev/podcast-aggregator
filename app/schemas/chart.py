@@ -5,12 +5,12 @@ import uuid
 from pydantic import BaseModel, Field
 
 
-ChartSource = Literal["spotify", "podchaser"]
+ChartSource = Literal["spotify", "podchaser", "apple"]
 ChartType = Literal["podcast", "episode"]
 
 
 class ChartQuery(BaseModel):
-    country: str = Field(min_length=2, max_length=2)
+    country: str = Field(min_length=2, max_length=2, pattern="^[A-Za-z]{2}$")
     category: str | None = Field(default=None, min_length=1, max_length=255)
     date: Date | None = None
     source: ChartSource

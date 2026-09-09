@@ -13,10 +13,10 @@ router = APIRouter(prefix="/charts", tags=["charts"])
 
 @router.get("", response_model=ChartResponse)
 def get_chart(
-    country: str = Query(min_length=2, max_length=2),
+    country: str = Query(min_length=2, max_length=2, pattern="^[A-Za-z]{2}$"),
     category: str | None = Query(default=None, min_length=1, max_length=255),
     snapshot_date: date | None = Query(default=None, alias="date"),
-    source: str = Query(pattern="^(spotify|podchaser)$"),
+    source: str = Query(pattern="^(spotify|podchaser|apple)$"),
     chart_type: str = Query(default="podcast", pattern="^(podcast|episode)$"),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),

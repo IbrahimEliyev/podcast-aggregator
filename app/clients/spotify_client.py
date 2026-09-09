@@ -66,6 +66,17 @@ class SpotifyClient:
                 continue
             show_uri = cls._string_value(item.get("showUri"))
             external_id = show_uri.removeprefix("spotify:show:") if show_uri else None
+            episode_uri = cls._string_value(
+                item.get("episodeUri") or item.get("episodeUrl")
+            )
+            episode_external_id = (
+                episode_uri.removeprefix("spotify:episode:") if episode_uri else None
+            )
+            episode_external_id = episode_external_id or cls._string_value(
+                item.get("episodeId") or item.get("episodeGuid")
+            )
+            episode_title = cls._string_value(item.get("episodeName") or item.get("episodeTitle"))
+            chart_type = "episode" if episode_external_id and episode_title else "podcast"
             podcast_url = (
                 f"https://open.spotify.com/show/{external_id}" if external_id else None
             )
@@ -76,12 +87,15 @@ class SpotifyClient:
                 NormalizedChartEntry(
                     rank=rank,
                     title=title,
+                    chart_type=chart_type,
                     external_id=external_id,
                     podcast_url=podcast_url,
                     image_url=cls._string_value(item.get("showImageUrl")),
                     publisher=cls._string_value(item.get("showPublisher")),
                     description=cls._string_value(item.get("showDescription")),
                     categories=[category] if category else [],
+                    episode_title=episode_title,
+                    episode_external_id=episode_external_id,
                 )
             )
         return entries
@@ -127,6 +141,9 @@ class SpotifyClient:
         title = value.get("title") or value.get("name")
         if isinstance(rank, int | float) and isinstance(title, str):
             external_id = value.get("id") or value.get("spotifyId") or value.get("uri")
+            episode_external_id = value.get("episodeId") or value.get("episodeGuid")
+            episode_title = value.get("episodeTitle") or value.get("episodeName")
+            chart_type = "episode" if episode_external_id and episode_title else "podcast"
             image = value.get("image") or value.get("imageUrl") or value.get("coverImageUrl")
             if isinstance(image, dict):
                 image = image.get("url")
@@ -134,12 +151,15 @@ class SpotifyClient:
                 NormalizedChartEntry(
                     rank=int(rank),
                     title=title.strip(),
+                    chart_type=chart_type,
                     external_id=str(external_id) if external_id else None,
                     podcast_url=cls._string_value(value.get("url") or value.get("href")),
                     image_url=cls._string_value(image),
                     publisher=cls._string_value(value.get("publisher") or value.get("author")),
                     description=cls._string_value(value.get("description")),
                     categories=[category] if category else [],
+                    episode_title=cls._string_value(episode_title),
+                    episode_external_id=cls._string_value(episode_external_id),
                 )
             )
         for child in value.values():

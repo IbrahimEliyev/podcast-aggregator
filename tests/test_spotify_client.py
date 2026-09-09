@@ -47,3 +47,20 @@ def test_parse_spotify_api_chart() -> None:
     assert entries[0].rank == 1
     assert entries[0].external_id == "show-1"
     assert entries[0].podcast_url == "https://open.spotify.com/show/show-1"
+
+
+def test_parse_spotify_episode_chart_entry() -> None:
+    payload = [
+        {
+            "showUri": "spotify:show:show-1",
+            "showName": "Spotify Podcast",
+            "episodeUri": "spotify:episode:episode-1",
+            "episodeName": "Episode One",
+        }
+    ]
+
+    entries = SpotifyClient.parse_api_chart(payload)
+
+    assert entries[0].chart_type == "episode"
+    assert entries[0].episode_external_id == "episode-1"
+    assert entries[0].episode_title == "Episode One"

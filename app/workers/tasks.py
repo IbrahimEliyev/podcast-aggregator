@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
+import os
 from uuid import UUID
 
 from app.clients.apple_podcasts_client import ApplePodcastsClient
+from app.clients.apple_charts_client import AppleChartsClient
+from app.clients.podchaser_client import PodchaserClient
 from app.clients.rss_client import RSSClient
 from app.clients.spotify_client import SpotifyClient
 from app.db.session import SessionLocal
@@ -12,6 +15,29 @@ from app.services.episode_service import EpisodeService
 from app.services.podcast_service import PodcastService
 from app.repositories.podcast_repository import PodcastRepository
 from app.workers.celery_app import celery_app
+
+
+def configured_chart_countries() -> list[str]:
+    """Return configured ISO-3166 alpha-2 markets, defaulting to US."""
+    raw_countries = os.getenv("CHART_COUNTRIES", "US").split(",")
+    countries = []
+    for raw_country in raw_countries:
+        country = raw_country.strip().upper()
+        if len(country) == 2 and country.isalpha() and country not in countries:
+            countries.append(country)
+    if not countries:
+        raise ValueError("CHART_COUNTRIES must contain at least one two-letter country code")
+    return countries
+
+
+def configured_spotify_countries() -> set[str]:
+    """Return markets supported by Spotify's public chart endpoint."""
+    raw_countries = os.getenv("CHART_SPOTIFY_COUNTRIES", "US,GB,CA,AU,DE").split(",")
+    return {
+        country.strip().upper()
+        for country in raw_countries
+        if len(country.strip()) == 2 and country.strip().isalpha()
+    }
 
 
 @celery_app.task(
@@ -41,6 +67,110 @@ def collect_spotify_chart(
         return len(podcast_ids)
     finally:
         client.close()
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def collect_podchaser_chart(
+    self, country: str = "US", category: str | None = None
+) -> int:
+    if os.getenv("PODCHASER_ENABLED", "false").lower() != "true":
+        return 0
+
+    client = PodchaserClient()
+    try:
+        entries = client.fetch_chart(country=country, category=category)
+        with SessionLocal.begin() as session:
+            podcast_ids = ChartIngestionService(session).ingest(
+                entries,
+                source="podchaser",
+                country=country,
+                category=category,
+                snapshot_date=date.today(),
+            )
+
+        for podcast_id in podcast_ids:
+            enrich_podcast.delay(str(podcast_id))
+        return len(podcast_ids)
+    finally:
+        client.close()
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    rate_limit="10/m",
+)
+def collect_apple_episode_chart(
+    self, country: str = "US", category: str | None = None
+) -> int:
+    client = AppleChartsClient()
+    try:
+        entries = client.fetch_trending_episodes(country=country, category=category)
+        with SessionLocal.begin() as session:
+            podcast_ids = ChartIngestionService(session).ingest(
+                entries,
+                source="apple",
+                country=country,
+                category=category,
+                snapshot_date=date.today(),
+            )
+
+        for podcast_id in podcast_ids:
+            enrich_podcast.delay(str(podcast_id))
+        return len(entries)
+    finally:
+        client.close()
+
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    rate_limit="10/m",
+)
+def collect_apple_podcast_chart(
+    self, country: str = "US", category: str | None = None
+) -> int:
+    client = AppleChartsClient()
+    try:
+        entries = client.fetch_top_shows(country=country, category=category)
+        with SessionLocal.begin() as session:
+            podcast_ids = ChartIngestionService(session).ingest(
+                entries,
+                source="apple",
+                country=country,
+                category=category,
+                snapshot_date=date.today(),
+            )
+
+        for podcast_id in podcast_ids:
+            enrich_podcast.delay(str(podcast_id))
+        return len(entries)
+    finally:
+        client.close()
+
+
+@celery_app.task
+def collect_configured_chart_countries() -> int:
+    """Queue provider-supported chart collection for every configured market."""
+    countries = configured_chart_countries()
+    spotify_countries = configured_spotify_countries()
+    for country in countries:
+        if country in spotify_countries:
+            collect_spotify_chart.delay(country, None)
+        collect_apple_podcast_chart.delay(country, None)
+        collect_apple_episode_chart.delay(country, None)
+        if os.getenv("PODCHASER_ENABLED", "false").lower() == "true":
+            collect_podchaser_chart.delay(country, None)
+    return len(countries)
 
 
 @celery_app.task(

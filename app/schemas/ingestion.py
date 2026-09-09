@@ -6,7 +6,9 @@ from datetime import datetime
 class NormalizedChartEntry:
     rank: int
     title: str
+    chart_type: str = "podcast"
     external_id: str | None = None
+    apple_id: str | None = None
     podcast_url: str | None = None
     image_url: str | None = None
     publisher: str | None = None

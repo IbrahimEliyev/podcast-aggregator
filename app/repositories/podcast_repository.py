@@ -75,6 +75,7 @@ class PodcastRepository:
         self, podcast: Podcast, metadata: EnrichedPodcastData
     ) -> Podcast:
         values = {
+            "title": metadata.title,
             "description": metadata.description,
             "author": metadata.author,
             "publisher": metadata.publisher,
