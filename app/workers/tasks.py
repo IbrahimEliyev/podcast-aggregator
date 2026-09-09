@@ -246,7 +246,12 @@ def sync_podcast_episodes(self, podcast_id: str) -> int:
                 return 0
 
             episodes = rss_client.fetch_episodes(podcast.rss_url)
-            return EpisodeService(session).sync_episodes(podcast.id, episodes)
+            episode_service = EpisodeService(session)
+            episode_count = episode_service.sync_episodes(podcast.id, episodes)
+            frequency = episode_service.calculate_frequency(episodes)
+            if frequency:
+                podcast.episode_frequency = frequency
+            return episode_count
     finally:
         rss_client.close()
 

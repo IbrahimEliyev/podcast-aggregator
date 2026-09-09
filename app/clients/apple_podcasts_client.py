@@ -87,6 +87,7 @@ class ApplePodcastsClient:
             publisher=result.get("artistName"),
             cover_image_url=result.get("artworkUrl600") or result.get("artworkUrl100"),
             rss_url=result.get("feedUrl"),
+            language=result.get("language"),
             rating=result.get("averageUserRating"),
             rating_count=result.get("userRatingCount"),
             apple_id=str(result["collectionId"]) if result.get("collectionId") else None,

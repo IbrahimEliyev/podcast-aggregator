@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from statistics import median
 
 from sqlalchemy.orm import Session
 
@@ -30,3 +31,37 @@ class EpisodeService:
                 duration_seconds=episode.duration_seconds,
             )
         return len(episodes)
+
+    @staticmethod
+    def calculate_frequency(episodes: list[NormalizedEpisode]) -> str | None:
+        """Estimate a human-readable publishing frequency from RSS dates."""
+        dates = sorted(
+            {
+                episode.published_at
+                for episode in episodes
+                if episode.published_at is not None
+            }
+        )
+        if len(dates) < 2:
+            return None
+
+        intervals = [
+            (current - previous).total_seconds() / 86400
+            for previous, current in zip(dates, dates[1:])
+            if current > previous
+        ]
+        if not intervals:
+            return None
+
+        median_days = median(intervals)
+        if median_days <= 1.5:
+            return "daily"
+        if median_days <= 8:
+            return "weekly"
+        if median_days <= 16:
+            return "biweekly"
+        if median_days <= 45:
+            return "monthly"
+        if median_days <= 100:
+            return "quarterly"
+        return "irregular"
